@@ -13,9 +13,10 @@ public class PlaceInfo {
     private LatLng latLng;
     private float rating;
     private String attributions;
+    private String lots;
 
     public PlaceInfo(String name, String phoneNumber, String id, String address,
-                     Uri websiteUri, LatLng latLng, float rating, String attributions) {
+                     Uri websiteUri, LatLng latLng, float rating, String attributions, String lots) {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.id = id;
@@ -24,6 +25,7 @@ public class PlaceInfo {
         this.latLng = latLng;
         this.rating = rating;
         this.attributions = attributions;
+        this.lots = lots;
     }
     public PlaceInfo() {
 
@@ -60,6 +62,9 @@ public class PlaceInfo {
     public String getAttributions() {
         return attributions;
     }
+    public  String getLots(){
+        return lots;
+    }
 
     public void setName(String name) {
         this.name = name;
@@ -91,6 +96,9 @@ public class PlaceInfo {
 
     public void setAttributions(String attributions) {
         this.attributions = attributions;
+    }
+    public void setLots(String lots){
+        this.lots = lots;
     }
 
     @Override

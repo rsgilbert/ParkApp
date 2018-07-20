@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">ParkApp</string>
+    <string name="gps_network_not_enabled">gps network not enabled</string>
+    <string name="open_location_settings">open location settings</string>
+    <string name="Cancel">Cancel</string>
+    <string name="parking_name">Parking lot name</string>
+    <string name="namemanager">Owner Name</string>
+    <string name="phone_number">Phone number</string>
+    <string name="username">UserName</string>
+    <string name="password_box">Password</string>
+    <string name="password_rbox">Confirm Password</string>
+    <string name="foremail">Enter email</string>
 </resources>

@@ -1,16 +1,26 @@
 package com.learning.one_pc.mymaps;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -28,18 +38,24 @@ import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.AddPlaceRequest;
 import com.google.android.gms.location.places.AutocompletePrediction;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.PlaceBuffer;
+import com.google.android.gms.location.places.PlaceBufferResponse;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PointOfInterest;
 import com.google.android.gms.tasks.OnCompleteListener;
 
 import com.google.android.gms.tasks.Task;
@@ -47,15 +63,14 @@ import com.learning.one_pc.mymaps.models.PlaceInfo;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback,
 GoogleApiClient.OnConnectionFailedListener{
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
-    }
-
+    public static int x = 21;
     private static final String TAG = "MapActivity";
     private static final String FLOCATION = Manifest.permission.ACCESS_FINE_LOCATION;
     private static final String CLOCATION = Manifest.permission.ACCESS_COARSE_LOCATION;
@@ -68,42 +83,77 @@ GoogleApiClient.OnConnectionFailedListener{
     private PlaceAutocompleteAdapter oPlaceAutocompleteAdapter;
     private GoogleApiClient oGoogleApiClient;
     private static final LatLngBounds LAT_LNG_BOUNDS = new LatLngBounds(new LatLng(-40, -168), new LatLng(71, 136));
-    private GeoDataClient oGeoDataClient;
+    private GeoDataClient oGeoDataClient, pGeoDataClient;
     private PlaceInfo oPlaceInfo;
     //widgets
     private AutoCompleteTextView searchbar;
     private ImageView oGps;
+    private Context context;
+    private static LatLng myPosition = new LatLng(0.3, 33);
 
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Toast.makeText(this, "No connection"+ connectionResult.getErrorMessage(), Toast.LENGTH_SHORT).show();
+    }
 
+    private static Boolean checkNetwork(Context mContext){
+        NetworkInfo info = ((ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE))
+                .getActiveNetworkInfo();
+        if(info == null || !info.isConnected()){
+            return false;
+        }
+        if(info.isRoaming()){
+            return true;
+        }
+        return true;
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        getLocationPermissions();
         searchbar = findViewById(R.id.edittext);
         oGps = findViewById(R.id.gps);
 
-    /*commit to memory. Another way of using a keylistener
-        searchbar.setOnKeyListener(new TextView.OnKeyListener() {
+        if(!checkNetwork(MapActivity.this)){
+            Toast.makeText(this, "No internet", Toast.LENGTH_LONG).show();
+        }
 
-            @Override
-            public boolean onKey(View view, int keyCode, KeyEvent keyEvent) {
-                //if the event is a key-down event on the "Enter" button
-                if((keyEvent.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)){
-                    Toast.makeText(MapActivity.this, "key is working!", Toast.LENGTH_LONG).show();
-                    geoLocate();
-                    return true;
-                }
-                return false;
+            if(isLocationEnabled(MapActivity.this)){
+                mActivity();
             }
-        });
-*/
+            else Toast.makeText(this, "Location not set", Toast.LENGTH_SHORT).show();
+
+
+    }
+    private void mActivity(){
+        try {
+            getLocationPermissions();
+        }
+        catch (Exception e){
+            Toast.makeText(this, "Error: "+ e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
 
         if(locationPermissions){
             initialiseMap();
         }
     }
+
+    private void getLocationPermissions(){
+        if(ContextCompat.checkSelfPermission(this.getApplicationContext(), FLOCATION) == PackageManager.PERMISSION_GRANTED){
+            if(ContextCompat.checkSelfPermission(this.getApplicationContext(), CLOCATION) == PackageManager.PERMISSION_GRANTED){
+                locationPermissions = true;
+            }
+            else
+                ActivityCompat.requestPermissions(this, permissions, REQUEST_LOCATION_CODE);
+        }
+        else
+            ActivityCompat.requestPermissions(this, permissions, REQUEST_LOCATION_CODE);
+    }
+    private void initialiseMap(){
+        SupportMapFragment mapfragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        mapfragment.getMapAsync(MapActivity.this);
+    }
+
 
     private void init(){
 
@@ -116,8 +166,17 @@ GoogleApiClient.OnConnectionFailedListener{
         oGeoDataClient = Places.getGeoDataClient(this, null);
 
 
-        oPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(this, oGeoDataClient, LAT_LNG_BOUNDS, null);
 
+
+        oPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(this, oGeoDataClient, LAT_LNG_BOUNDS, null);
+        searchbar.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        searchbar.setText("");
+                    }
+                }
+        );
         searchbar.setOnItemClickListener(oAutocompleteClickListener);
         searchbar.setAdapter(oPlaceAutocompleteAdapter);
         searchbar.setOnEditorActionListener(
@@ -140,10 +199,11 @@ GoogleApiClient.OnConnectionFailedListener{
                     @Override
                     public void onClick(View view) {
                         getDeviceLocation();
+                        searchbar.setText(myPosition.toString());
+
                     }
                 }
         );
-
         }
     private void geoLocate(){
 
@@ -179,8 +239,11 @@ GoogleApiClient.OnConnectionFailedListener{
                             public void onComplete(@NonNull Task task) {
                                 if(task.isSuccessful()){
                                     Location location = (Location) task.getResult();
-                                    moveCam(new LatLng(location.getLatitude(), location.getLongitude()), DEFAULT_ZOOM, "My Position");
-                                     }
+                                    myPosition =  new LatLng(location.getLatitude(), location.getLongitude());
+                                    moveCam(myPosition, DEFAULT_ZOOM, "My Position");
+
+
+                                }
                             }
                         }
                 );
@@ -201,16 +264,18 @@ GoogleApiClient.OnConnectionFailedListener{
                     .title(title);
             gMap.addMarker(marker);
         }
-
     }
     //overiding method moveCam..
     private  void moveCam(LatLng latLng, float zoom, PlaceInfo placeInfo){
         gMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
 
         gMap.clear();
-        if(placeInfo != null) {
+
             try {
                 String snippet = placeInfo.getPhoneNumber();
+                if(placeInfo.getLots() != null){
+                    snippet = placeInfo.getPhoneNumber()+ placeInfo.getLots();
+                }
 
                 MarkerOptions options = new MarkerOptions()
                         .title(placeInfo.getName())
@@ -220,24 +285,10 @@ GoogleApiClient.OnConnectionFailedListener{
                 gMap.addMarker(options);
             } catch (NullPointerException e) {
                 Toast.makeText(this, "NullPointerException: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        }
-        else
-            gMap.addMarker(new MarkerOptions().position(latLng).title(placeInfo.getName()).snippet(placeInfo.getPhoneNumber()));
-
+                }
 
     }
-    private void getLocationPermissions(){
-        if(ContextCompat.checkSelfPermission(this.getApplicationContext(), FLOCATION) == PackageManager.PERMISSION_GRANTED){
-            if(ContextCompat.checkSelfPermission(this.getApplicationContext(), CLOCATION) == PackageManager.PERMISSION_GRANTED){
-                locationPermissions = true;
-            }
-            else
-                ActivityCompat.requestPermissions(this, permissions, REQUEST_LOCATION_CODE);
-        }
-        else
-            ActivityCompat.requestPermissions(this, permissions, REQUEST_LOCATION_CODE);
-    }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -253,15 +304,10 @@ GoogleApiClient.OnConnectionFailedListener{
                     }
                     Toast.makeText(this, "permissions are granted for the first time", Toast.LENGTH_LONG).show();
                     //initialise map
-                    initialiseMap();
+                    mActivity();
                 }
             }
         }
-    }
-    private void initialiseMap(){
-
-        SupportMapFragment mapfragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
-        mapfragment.getMapAsync(MapActivity.this);
     }
 
     @Override
@@ -277,9 +323,66 @@ GoogleApiClient.OnConnectionFailedListener{
             gMap.setMyLocationEnabled(true);
             gMap.getUiSettings().setMyLocationButtonEnabled(true);
             init();
-
+           markers(gMap);
+            mSetPoiClick(gMap);
         }
     }
+    private void markers(final GoogleMap kmap){
+        MarkerOptions mo = new MarkerOptions()
+                .position(new LatLng(0.3292018, 32.57098675))
+                .title("New Joel park")
+                .snippet("10 available lots")
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.car1));
+        mo.visible(true);
+        kmap.addMarker(mo);
+
+        Marker mk = kmap.addMarker(
+                new MarkerOptions()
+                        .position(new LatLng(0.3298, 32.56))
+                        .title("Park Yakuna")
+                        .snippet(x+ " available lots")
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.car1))
+        );
+
+        mk.showInfoWindow();
+        Marker mk2 = kmap.addMarker(
+                new MarkerOptions()
+                        .position(new LatLng(0.329, 32.57))
+                        .title("timothy park")
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.car1))
+                        .snippet("3 available lots")
+        );
+        mk2.showInfoWindow();
+        Marker mk3 = kmap.addMarker(
+                new MarkerOptions()
+                        .position(new LatLng(0.33, 32.573))
+                        .title(" my New park")
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.car1))
+                        .snippet("2 available lots")
+        );
+        mk.showInfoWindow();
+    }
+
+    private void mSetPoiClick(final GoogleMap map){
+        map.setOnPoiClickListener(
+                new GoogleMap.OnPoiClickListener() {
+                    @Override
+                    public void onPoiClick(PointOfInterest pointOfInterest) {
+                        map.clear();
+                        Marker poiMarker = map.addMarker(
+                                new MarkerOptions()
+                                        .position(pointOfInterest.latLng)
+                                        .title(pointOfInterest.name)
+                        );
+                        poiMarker.showInfoWindow();
+                        markers(map);
+                        searchbar.setText(pointOfInterest.latLng.toString());
+
+                    }
+                }
+        );
+    }
+
 
     //hide keyboard on selection
     private void hideSoftKeyboard(){
@@ -316,42 +419,69 @@ GoogleApiClient.OnConnectionFailedListener{
                 oPlaceInfo.setPhoneNumber(place.getPhoneNumber().toString());
 
 
-/*unnecessary
-            oPlaceInfo = new PlaceInfo();
-            try {
-                Toast.makeText(MapActivity.this, "tick1", Toast.LENGTH_SHORT).show();
-                oPlaceInfo.setId(place.getId());
-                Toast.makeText(MapActivity.this, "tick2", Toast.LENGTH_SHORT).show();
-
-                oPlaceInfo.setAddress(place.getAddress().toString());
-                Toast.makeText(MapActivity.this, "tick3", Toast.LENGTH_SHORT).show();
-
-
-                oPlaceInfo.setLatLng(place.getLatLng());
-                Toast.makeText(MapActivity.this, "tick5", Toast.LENGTH_SHORT).show();
-
-                if(place.getPhoneNumber() != null) {
-                    oPlaceInfo.setPhoneNumber(place.getPhoneNumber().toString());
-                    Toast.makeText(MapActivity.this, "tick6", Toast.LENGTH_SHORT).show();
-                }
-                if(place.getWebsiteUri() != null) {
-                    oPlaceInfo.setWebsiteUri(place.getWebsiteUri());
-                    Toast.makeText(MapActivity.this, "tick7", Toast.LENGTH_SHORT).show();
-                }
-                if(place.getAttributions() != null){
-                    oPlaceInfo.setAttributions(place.getAttributions().toString());
-                }
-
-            }
-            catch (NullPointerException e){
-                Toast.makeText(MapActivity.this, "Error in setting info: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-             moveCam(new LatLng(place.getViewport().getCenter().latitude, place.getViewport().getCenter().longitude), DEFAULT_ZOOM, oPlaceInfo);
-
-            */
-            moveCam(oPlaceInfo.getLatLng(), DEFAULT_ZOOM, oPlaceInfo.getName());
+      moveCam(oPlaceInfo.getLatLng(), DEFAULT_ZOOM, oPlaceInfo);
             places.release();
         }
     };
+    private void gpsAndNetworkCheck(){
+        LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        boolean gps_enabled = false;
+        boolean network_enabled = false;
+
+        try {
+            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        } catch(Exception ex) {}
+
+        try {
+            network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        } catch(Exception ex) {}
+
+        if(!gps_enabled && !network_enabled) {
+            // notify user
+            AlertDialog.Builder dialog = new AlertDialog.Builder(context);
+            dialog.setMessage(context.getResources().getString(R.string.gps_network_not_enabled));
+            dialog.setPositiveButton(context.getResources().getString(R.string.open_location_settings), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                    // TODO Auto-generated method stub
+                    Intent myIntent = new Intent( Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                    context.startActivity(myIntent);
+                    //get gps
+                }
+            });
+            dialog.setNegativeButton(context.getString(R.string.Cancel), new DialogInterface.OnClickListener() {
+
+                @Override
+                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                    // TODO Auto-generated method stub
+
+                }
+            });
+            dialog.show();
+        }
+    }
+
+    public static boolean isLocationEnabled(Context context) {
+        int locationMode = 0;
+        String locationProviders;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+            try {
+                locationMode = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.LOCATION_MODE);
+
+            } catch (Settings.SettingNotFoundException e) {
+                e.printStackTrace();
+                return false;
+            }
+
+            return locationMode != Settings.Secure.LOCATION_MODE_OFF;
+
+        }else{
+            locationProviders = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+            return !TextUtils.isEmpty(locationProviders);
+        }
+
+
+    }
 
 }
